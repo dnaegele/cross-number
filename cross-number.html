@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cross-number — arithmetic crossword generator</title>
+<style>
+:root{
+  --page:#D7D4CA; --panel:#E8E5DB; --cell-paper:#F5F3EC; --black-cell:#1A1A17;
+  --ink:#1B1B18; --ink-soft:#615F55; --line:#1B1B18; --line-soft:rgba(27,27,24,.20);
+  --accent:#1C7CC0; --accent-ink:#0F5E96; --olive:#A4A73D; --teal:#2C9E83;
+  --sans:"Helvetica Neue",Helvetica,Arial,"Segoe UI",Roboto,system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono","SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--ink);font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;line-height:1.4;padding:26px 18px}
+.device{max-width:1080px;margin:0 auto;background:var(--panel);border:1px solid var(--ink);
+  border-radius:14px;padding:22px 24px 26px;
+  box-shadow:0 1px 0 rgba(255,255,255,.55) inset,0 22px 48px -28px rgba(0,0,0,.45)}
+
+.masthead{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;
+  border-bottom:1px solid var(--line);padding-bottom:16px}
+.brand{display:flex;flex-direction:column;gap:8px}
+.wordmark{font-weight:700;font-size:27px;letter-spacing:-.02em;line-height:1;display:flex;align-items:center;gap:9px}
+.wordmark .led{width:9px;height:9px;border-radius:50%;background:var(--olive);
+  box-shadow:0 0 0 1px rgba(0,0,0,.25) inset, 0 0 6px rgba(164,167,61,.6)}
+.model{font:600 11px var(--mono);color:var(--ink-soft);border:1px solid var(--line);
+  padding:2px 6px;border-radius:3px;display:inline-block;width:max-content}
+.spec{font:500 10.5px/1.55 var(--mono);color:var(--ink-soft);text-align:left}
+.spec span{display:block}
+.serial{font:600 12px var(--mono);color:var(--accent-ink);border:1px solid var(--line);
+  padding:5px 9px;border-radius:5px;background:var(--cell-paper);white-space:nowrap}
+
+.body{display:grid;grid-template-columns:282px 1fr;gap:24px;margin-top:18px}
+@media(max-width:840px){.body{grid-template-columns:1fr}}
+
+.controls{display:flex;flex-direction:column;gap:0}
+.field{display:grid;grid-template-columns:30px 1fr;gap:11px;align-items:start;
+  padding:14px 0;border-bottom:1px solid var(--line-soft)}
+.field:first-child{padding-top:2px}
+.ftag{width:28px;height:28px;border:1px solid var(--line);border-radius:4px;display:grid;
+  place-items:center;font:600 13px var(--mono);color:var(--ink);background:var(--cell-paper)}
+.fmain{min-width:0}
+.fmain>label{display:block;font-size:11px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;margin-bottom:8px;color:var(--ink)}
+.hint{font:500 11px/1.45 var(--mono);color:var(--ink-soft);margin-top:7px}
+.frow{display:flex;gap:8px;align-items:center}
+input[type=number],input[type=text]{background:var(--cell-paper);border:1px solid var(--line);
+  border-radius:4px;padding:7px 8px;font:500 13px var(--mono);color:var(--ink);width:100%}
+input.num{width:74px;flex:none}
+.valout{display:grid;place-items:center;min-width:42px;height:34px;border:1px solid var(--line);
+  border-radius:4px;background:var(--cell-paper);font:600 13px var(--mono);color:var(--ink);flex:none}
+.sep{font:500 12px var(--mono);color:var(--ink-soft)}
+input[type=range]{flex:1;accent-color:var(--accent);height:22px}
+input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+.ops{display:flex;gap:8px}
+.op{position:relative;cursor:pointer}
+.op input{position:absolute;opacity:0;width:1px;height:1px}
+.op .opsym{display:grid;place-items:center;width:46px;height:36px;border:1px solid var(--line);
+  border-radius:4px;font:500 17px var(--mono);background:var(--cell-paper);color:var(--ink);
+  user-select:none;transition:background .12s,color .12s}
+.op input:checked + .opsym{background:var(--accent);color:#fff;border-color:var(--accent-ink)}
+.op input:focus-visible + .opsym{outline:2px solid var(--accent);outline-offset:2px}
+
+.btn{font:600 13px var(--sans);letter-spacing:.01em;padding:9px 14px;border:1px solid var(--line);
+  border-radius:6px;background:var(--cell-paper);color:var(--ink);cursor:pointer;transition:background .12s}
+.btn:hover{background:#fff}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);border-color:var(--accent-ink);color:#fff;width:100%;
+  padding:12px;font-size:14px;margin-top:16px;letter-spacing:.02em}
+.btn.primary:hover{background:var(--accent-ink)}
+
+.stage{min-width:0}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:14px;
+  flex-wrap:wrap;margin-bottom:14px}
+.readout{font:500 11.5px/1.7 var(--mono);color:var(--ink-soft);display:flex;gap:8px 16px;flex-wrap:wrap}
+.readout b{color:var(--ink);font-weight:600}
+.tools{display:flex;gap:14px;align-items:center}
+.switch{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.06em;cursor:pointer;color:var(--ink)}
+.switch input{appearance:none;-webkit-appearance:none;width:34px;height:18px;border:1px solid var(--line);
+  border-radius:10px;background:var(--cell-paper);position:relative;cursor:pointer;transition:background .15s}
+.switch input::after{content:"";position:absolute;top:1px;left:1px;width:14px;height:14px;
+  border-radius:50%;background:var(--ink);transition:transform .15s}
+.switch input:checked{background:var(--teal);border-color:var(--teal)}
+.switch input:checked::after{transform:translateX(16px);background:#fff}
+.switch input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.puzzlewrap{display:flex;justify-content:center}
+.gridframe{padding:18px;border:1px solid var(--line);border-radius:8px;width:100%;min-height:140px;
+  display:flex;justify-content:center;align-items:center;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 11px,rgba(27,27,24,.045) 11px 12px),
+    repeating-linear-gradient(90deg,transparent 0 11px,rgba(27,27,24,.045) 11px 12px),
+    var(--panel)}
+.grid{display:grid;grid-template-columns:repeat(var(--n),var(--cell));gap:1px;
+  background:var(--ink);border:1px solid var(--ink);width:max-content;animation:fade .25s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.cell{width:var(--cell);height:var(--cell);background:var(--cell-paper);position:relative}
+.cell.black{background:var(--black-cell)}
+.cell .num{position:absolute;top:1px;left:2px;font:600 calc(var(--cell)*.30)/1 var(--mono);
+  color:var(--ink-soft);pointer-events:none}
+.cell .dig{position:absolute;inset:0;display:grid;place-items:center;
+  font:500 calc(var(--cell)*.52)/1 var(--mono);color:var(--ink)}
+.grid:not(.show) .dig{visibility:hidden}
+.message{font:500 13px/1.6 var(--mono);color:var(--ink);max-width:400px;text-align:center;padding:22px}
+.message .big{font-family:var(--sans);font-weight:700;font-size:15px;margin-bottom:9px;color:var(--accent-ink)}
+
+.clues{margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:28px;
+  border-top:1px solid var(--line);padding-top:18px}
+@media(max-width:560px){.clues{grid-template-columns:1fr}}
+.cluecol h2{font-size:11px;text-transform:uppercase;letter-spacing:.14em;font-weight:700;
+  margin:0 0 11px;padding-bottom:7px;border-bottom:1px solid var(--line-soft)}
+.cluecol ol{list-style:none;margin:0;padding:0}
+.cluecol li{display:grid;grid-template-columns:30px 1fr auto;gap:9px;align-items:baseline;
+  font:500 13px/1.55 var(--mono);padding:2px 0}
+.cn{text-align:right;color:var(--ink-soft);font-weight:600}
+.cl{color:var(--ink)}
+.cv{color:var(--teal);font-weight:600;white-space:nowrap}
+.clues:not(.show) .cv{display:none}
+.empty{color:var(--ink-soft);font:500 12px var(--mono);grid-column:1/-1}
+
+/* answer key: screen-hidden, prints on its own page */
+.answerkey{display:none}
+.akhead{display:flex;justify-content:space-between;align-items:baseline;
+  border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:16px;
+  font:700 12px var(--sans);text-transform:uppercase;letter-spacing:.12em}
+.akhead .akserial{font:600 12px var(--mono);color:var(--accent-ink);letter-spacing:0}
+.akgridwrap{display:flex;justify-content:flex-start;margin-bottom:18px}
+.akclues{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.akclues .cv{color:var(--ink)}
+
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+@media(max-width:600px){
+  body{padding:14px 10px}
+  .device{padding:16px 16px 20px}
+  .masthead{flex-direction:column;align-items:flex-start;gap:12px}
+  .serial{align-self:flex-start}
+}
+
+@page{size:letter portrait;margin:0.6in 1in 1in 1in}
+@media print{
+  body{background:#fff;padding:0}
+  .device{box-shadow:none;border:none;border-radius:0;max-width:none;margin:0;padding:0;background:#fff}
+  .controls,.model,.spec,.toolbar{display:none}
+  .wordmark .led{display:none}
+  .wordmark{font-size:22px}
+  .body{grid-template-columns:1fr;gap:0;margin-top:48px}
+  .masthead{padding-bottom:14px;border-color:#000;align-items:baseline}
+  .serial{border:none;background:none;color:#000;padding:0;white-space:normal;font:600 12px var(--mono)}
+  .serial::before{content:"puzzle "}
+
+  /* full-width square grid, pure black & white */
+  .puzzlewrap{display:block}
+  .gridframe{border:none;background:#fff;padding:0;min-height:auto;margin:0 0 48px;display:flex;justify-content:center}
+  .grid{--cell:min(0.5in, (6.5in - (var(--n) + 1) * 1px) / var(--n))!important;
+        grid-template-columns:repeat(var(--n),var(--cell))!important;
+        width:max-content;background:#000;border:1px solid #000;animation:none!important}
+  .cell{background:#fff}
+  .cell.black{background:#000}
+  .cell .num{font-family:var(--mono);font-weight:600;line-height:1;font-size:clamp(6px,calc(var(--cell)*.17),9px);color:#808080}
+  .cell .dig{font:500 calc(var(--cell)*.5)/1 var(--mono);color:#000}
+  #grid .dig{visibility:hidden}            /* page 1 puzzle stays blank */
+  .grid,.cell,.cell.black,.cell .num,.cell .dig{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+  /* clues: compact, full width, flowing columns, gray numbers */
+  .clues,.akclues{display:block;border-top:1px solid #000;padding-top:32px;margin-top:0}
+  .cluecol ol{column-count:4;column-gap:24px}
+  .cluecol + .cluecol{margin-top:24px}
+  .clues .cv{display:none}                 /* page 1 clues stay blank */
+  .cluecol{break-inside:auto}
+  .cluecol h2{break-after:avoid;color:#000;border:none;font-size:10px;letter-spacing:.16em;margin-bottom:14px;padding:0}
+  .cluecol li{break-inside:avoid;font-size:10.5px;line-height:1.55;padding:1.5px 0;grid-template-columns:24px 1fr auto;gap:8px}
+  .cn{color:#808080}
+  .cl{color:#000}
+  .cv{color:#000}
+
+  /* answer key on its own page */
+  .answerkey{display:block;break-before:page}
+  .akhead{border-color:#000;margin-bottom:28px;padding-bottom:14px}
+  .akhead .akserial{color:#000}
+  .akhead .akserial::before{content:"puzzle "}
+  .akgridwrap{margin-bottom:48px}
+  .akclues .cv{color:#000}
+}
+</style>
+</head>
+<body>
+<div class="device">
+  <header class="masthead">
+    <div class="brand">
+      <div class="wordmark"><span class="led"></span><span class="mk">cross-number</span></div>
+      <div class="model">cn-01</div>
+    </div>
+    <div class="spec">
+      <span>arithmetic crossword generator</span>
+      <span>addition · subtraction · multiplication · division</span>
+      <span>positive-integer answers · <span id="yearRoman">mmxxvi</span></span>
+    </div>
+    <div class="serial" id="serial">cn-—</div>
+  </header>
+
+  <div class="body">
+    <aside class="controls" id="controls">
+      <div class="field">
+        <div class="ftag">N</div>
+        <div class="fmain">
+          <label for="size">Grid size</label>
+          <div class="frow">
+            <input type="range" id="sizeRange" min="5" max="25" value="9" aria-label="Grid size slider">
+            <input type="number" id="size" class="num" min="5" max="25" value="9" aria-label="Grid size">
+          </div>
+          <div class="hint">Squares per side.</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="ftag">R</div>
+        <div class="fmain">
+          <label>Operand range</label>
+          <div class="frow">
+            <input type="number" id="minOp" class="num" value="0" aria-label="Minimum operand">
+            <span class="sep">to</span>
+            <input type="number" id="maxOp" class="num" value="20" aria-label="Maximum operand">
+          </div>
+          <div class="hint">Values used in each problem.</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="ftag">M</div>
+        <div class="fmain">
+          <label for="maxSol">Max solution</label>
+          <div class="frow">
+            <input type="number" id="maxSol" value="40" min="10" aria-label="Maximum solution">
+          </div>
+          <div class="hint">Highest answer allowed.</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="ftag">F</div>
+        <div class="fmain">
+          <label>Operations</label>
+          <div class="ops">
+            <label class="op"><input type="checkbox" id="opAdd" checked><span class="opsym">+</span></label>
+            <label class="op"><input type="checkbox" id="opSub" checked><span class="opsym">−</span></label>
+            <label class="op"><input type="checkbox" id="opMul"><span class="opsym">×</span></label>
+            <label class="op"><input type="checkbox" id="opDiv"><span class="opsym">÷</span></label>
+          </div>
+          <div class="hint">Operations allowed in clues</div>
+        </div>
+      </div>
+
+      <!-- Black-squares control: hidden by default. Remove style="display:none" on the line below to re-enable it. -->
+      <div class="field" id="densityField" style="display:none">
+        <div class="ftag">B</div>
+        <div class="fmain">
+          <label for="density">Black squares</label>
+          <div class="frow">
+            <input type="range" id="density" min="0" max="10" step="1" value="1" aria-label="Black-square density">
+            <span class="valout" id="densityOut">1</span>
+          </div>
+          <div class="hint">Higher adds more black squares and shorter runs. A low max solution forces a denser grid regardless.</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="ftag">S</div>
+        <div class="fmain">
+          <label for="seed">Serial</label>
+          <div class="frow">
+            <input type="text" id="seed" placeholder="random" aria-label="Serial">
+          </div>
+          <div class="hint">Build a specific puzzle.</div>
+        </div>
+      </div>
+
+      <button id="generate" class="btn primary">Generate</button>
+    </aside>
+
+    <main class="stage">
+      <div class="toolbar">
+        <div class="readout" id="readout">ready</div>
+        <div class="tools">
+          <label class="switch"><input type="checkbox" id="showAnswers"><span>Answers</span></label>
+          <button id="print" class="btn">Print</button>
+        </div>
+      </div>
+
+      <div class="puzzlewrap">
+        <div class="gridframe" id="gridframe"><div class="grid" id="grid"></div></div>
+      </div>
+
+      <section class="clues" id="clues">
+        <div class="cluecol"><h2>Across</h2><ol id="acrossList"></ol></div>
+        <div class="cluecol"><h2>Down</h2><ol id="downList"></ol></div>
+      </section>
+
+      <section class="answerkey" id="answerKey">
+        <div class="akhead"><span class="akserial" id="akSerial"></span><span>Answer key</span></div>
+        <div class="akgridwrap"><div class="grid show" id="akGrid"></div></div>
+        <section class="akclues">
+          <div class="cluecol"><h2>Across</h2><ol id="akAcross"></ol></div>
+          <div class="cluecol"><h2>Down</h2><ol id="akDown"></ol></div>
+        </section>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ============================================================================
+   CROSS-NUMBER PUZZLE ENGINE  (pure logic, no DOM)
+   params -> black-square pattern -> slots -> digit fill -> clues
+   ========================================================================== */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function shuffle(arr,rnd){for(let i=arr.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));const t=arr[i];arr[i]=arr[j];arr[j]=t;}return arr;}
+function randint(rnd,lo,hi){return lo+Math.floor(rnd()*(hi-lo+1));}
+function numDigits(n){return String(Math.abs(Math.trunc(n))).length;}
+
+function makeArith(params){
+  const {minOp,maxOp,maxSol,ops}=params;
+  function addOK(v){return Math.max(minOp,v-maxOp)<=Math.min(maxOp,v-minOp);}
+  function subOK(v){return Math.max(minOp,v+minOp)<=Math.min(maxOp,v+maxOp);}
+  function mulPairs(v){const out=[];for(let d=1;d*d<=v;d++){if(v%d===0){const e=v/d;const cand=[[d,e],[e,d],[-d,-e],[-e,-d]];for(let i=0;i<4;i++){const a=cand[i][0],b=cand[i][1];if(a>=minOp&&a<=maxOp&&b>=minOp&&b<=maxOp)out.push([a,b]);}}}return out;}
+  function mulOK(v){for(let d=1;d*d<=v;d++){if(v%d===0){const e=v/d;const cand=[[d,e],[e,d],[-d,-e],[-e,-d]];for(let i=0;i<4;i++){const a=cand[i][0],b=cand[i][1];if(a>=minOp&&a<=maxOp&&b>=minOp&&b<=maxOp)return true;}}}return false;}
+  function divPairs(v){const out=[];let blo=Math.ceil(minOp/v),bhi=Math.floor(maxOp/v);blo=Math.max(blo,minOp);bhi=Math.min(bhi,maxOp);for(let b=blo;b<=bhi;b++){if(b===0)continue;const a=v*b;if(a>=minOp&&a<=maxOp)out.push([a,b]);}return out;}
+  function divOK(v){return divPairs(v).length>0;}
+  function achievable(v){if(v<1||v>maxSol)return false;if(ops.add&&addOK(v))return true;if(ops.sub&&subOK(v))return true;if(ops.mul&&mulOK(v))return true;if(ops.div&&divOK(v))return true;return false;}
+  function trivial(c){if(c.op==='add')return c.a===0||c.b===0;if(c.op==='sub')return c.b===0||c.a===0;if(c.op==='mul')return Math.abs(c.a)===1||Math.abs(c.b)===1;return Math.abs(c.b)===1;}
+  function clue(v,rnd){
+    const cands=[];
+    if(ops.add&&addOK(v)){const lo=Math.max(minOp,v-maxOp),hi=Math.min(maxOp,v-minOp);for(let t=0;t<6;t++){const a=randint(rnd,lo,hi);cands.push({a,b:v-a,sym:'+',op:'add',value:v});}}
+    if(ops.sub&&subOK(v)){const lo=Math.max(minOp,v+minOp),hi=Math.min(maxOp,v+maxOp);for(let t=0;t<6;t++){const a=randint(rnd,lo,hi);cands.push({a,b:a-v,sym:'\u2212',op:'sub',value:v});}}
+    if(ops.mul){const ps=mulPairs(v);for(let j=0;j<ps.length&&j<10;j++)cands.push({a:ps[j][0],b:ps[j][1],sym:'\u00D7',op:'mul',value:v});}
+    if(ops.div){const ps=divPairs(v);for(let j=0;j<ps.length&&j<10;j++)cands.push({a:ps[j][0],b:ps[j][1],sym:'\u00F7',op:'div',value:v});}
+    if(!cands.length)return null;
+    const good=cands.filter(c=>!trivial(c));
+    const pool=good.length?good:cands;
+    return pool[Math.floor(rnd()*pool.length)];
+  }
+  return {achievable,clue};
+}
+function fmtOperand(n){return n<0?'('+String(n).replace('-','\u2212')+')':String(n);}
+function fmtClue(c){return fmtOperand(c.a)+' '+c.sym+' '+fmtOperand(c.b);}
+
+function feasibleLenSet(arith,maxLen,maxSol){const set=new Set();for(let L=2;L<=maxLen;L++){const lo=Math.pow(10,L-1),hi=Math.min(Math.pow(10,L)-1,maxSol);if(lo>hi)continue;const cap=Math.min(hi,lo+60000);let ok=false;for(let v=lo;v<=hi;v++){if(arith.achievable(v)){ok=true;break;}if(v>=cap)break;}if(ok)set.add(L);}return set;}
+function buildWordlist(arith,L,maxSol){const lo=Math.pow(10,L-1),hi=Math.min(Math.pow(10,L)-1,maxSol);const vals=[];const cap=300000;for(let v=lo;v<=hi;v++){if(arith.achievable(v)){const s=String(v);const arr=new Array(s.length);for(let k=0;k<s.length;k++)arr[k]=s.charCodeAt(k)-48;vals.push(arr);}if(vals.length>=cap)break;}return vals;}
+
+/* ===================== GRID PATTERN MODULE (isolated / swappable) ========= */
+const GRID=(function(){
+  const SYMMETRY=true;
+  function mirror(N,r,c){return SYMMETRY?[N-1-r,N-1-c]:[r,c];}
+  function randomSeed(N,p,rnd){const black=Array.from({length:N},()=>Array(N).fill(false));for(let r=0;r<N;r++)for(let c=0;c<N;c++){if(black[r][c])continue;if(rnd()<p){const m=mirror(N,r,c);black[r][c]=true;black[m[0]][m[1]]=true;}}return black;}
+  function repair(black,N,maxLen){let guard=0;while(guard++<8000){let acted=false;
+    for(let r=0;r<N&&!acted;r++){let c=0;while(c<N){if(black[r][c]){c++;continue;}let s=c;while(c<N&&!black[r][c])c++;if(c-s>maxLen){const cut=s+maxLen;const m=mirror(N,r,cut);black[r][cut]=true;black[m[0]][m[1]]=true;acted=true;break;}}}
+    if(acted)continue;
+    for(let c=0;c<N&&!acted;c++){let r=0;while(r<N){if(black[r][c]){r++;continue;}let s=r;while(r<N&&!black[r][c])r++;if(r-s>maxLen){const cut=s+maxLen;const m=mirror(N,cut,c);black[cut][c]=true;black[m[0]][m[1]]=true;acted=true;break;}}}
+    if(acted)continue;
+    const RL=runLengths(black,N);for(let r=0;r<N&&!acted;r++)for(let c=0;c<N&&!acted;c++){if(!black[r][c]&&Math.max(RL.aLen[r][c],RL.dLen[r][c])<2){const m=mirror(N,r,c);black[r][c]=true;black[m[0]][m[1]]=true;acted=true;}}
+    if(!acted)break;}
+    return black;}
+  function make(N,maxLen,rnd,densityOverride){const p=densityOverride!=null?densityOverride:(maxLen<=2?0.06:maxLen===3?0.13:maxLen===4?0.12:0.11);const black=randomSeed(N,p,rnd);repair(black,N,maxLen);return black;}
+  return {make,mirror,SYMMETRY};
+})();
+/* ===================== END GRID PATTERN MODULE =========================== */
+
+function runLengths(black,N){const aLen=Array.from({length:N},()=>Array(N).fill(0));const dLen=Array.from({length:N},()=>Array(N).fill(0));for(let r=0;r<N;r++){let c=0;while(c<N){if(black[r][c]){c++;continue;}let s=c;while(c<N&&!black[r][c])c++;for(let k=s;k<c;k++)aLen[r][k]=c-s;}}for(let c=0;c<N;c++){let r=0;while(r<N){if(black[r][c]){r++;continue;}let s=r;while(r<N&&!black[r][c])r++;for(let k=s;k<r;k++)dLen[k][c]=r-s;}}return {aLen,dLen};}
+function extractSlots(black,N){const slots=[];for(let r=0;r<N;r++){let c=0;while(c<N){if(black[r][c]){c++;continue;}const cells=[];while(c<N&&!black[r][c]){cells.push([r,c]);c++;}if(cells.length>=2)slots.push({dir:'A',len:cells.length,cells});}}for(let c=0;c<N;c++){let r=0;while(r<N){if(black[r][c]){r++;continue;}const cells=[];while(r<N&&!black[r][c]){cells.push([r,c]);r++;}if(cells.length>=2)slots.push({dir:'D',len:cells.length,cells});}}return slots;}
+function numberGrid(black,N){const num={};let n=0;const across=[],down=[];for(let r=0;r<N;r++)for(let c=0;c<N;c++){if(black[r][c])continue;const startA=(c===0||black[r][c-1])&&(c+1<N&&!black[r][c+1]);const startD=(r===0||black[r-1][c])&&(r+1<N&&!black[r+1][c]);if(startA||startD){n++;num[r+','+c]=n;if(startA)across.push({n,r,c});if(startD)down.push({n,r,c});}}return {num,across,down};}
+
+function fillGrid(black,N,slots,wls,rnd){
+  const digit=Array.from({length:N},(_,r)=>Array.from({length:N},(_,c)=>black[r][c]?-2:-1));
+  const cand=slots.map(s=>wls[s.len]);const assigned=new Array(slots.length).fill(false);let steps=0;const budget=400000;
+  function consistent(v,s){for(let k=0;k<s.cells.length;k++){const d=digit[s.cells[k][0]][s.cells[k][1]];if(d>=0&&d!==v[k])return false;}return true;}
+  function count(i){const s=slots[i];let c=0;const cap=300;const list=cand[i];for(let j=0;j<list.length;j++){if(consistent(list[j],s)){c++;if(c>=cap)break;}}return c;}
+  function pick(){let best=-1,bc=Infinity;for(let i=0;i<slots.length;i++){if(assigned[i])continue;const c=count(i);if(c<bc){bc=c;best=i;if(c<=1)break;}}return best;}
+  function solve(rem){if(rem===0)return true;if(steps++>budget)return false;const i=pick();if(i<0)return false;const s=slots[i];const cons=[];const list=cand[i];for(let j=0;j<list.length;j++)if(consistent(list[j],s))cons.push(list[j]);shuffle(cons,rnd);assigned[i]=true;for(let j=0;j<cons.length;j++){const v=cons[j];const changed=[];for(let k=0;k<s.cells.length;k++){const r=s.cells[k][0],c=s.cells[k][1];if(digit[r][c]===-1){digit[r][c]=v[k];changed.push([r,c]);}}if(solve(rem-1))return true;for(let k=0;k<changed.length;k++)digit[changed[k][0]][changed[k][1]]=-1;}assigned[i]=false;return false;}
+  return solve(slots.length)?digit:null;
+}
+function makeClues(slots,digit,arith,rnd,numbering){const across=[],down=[];for(const s of slots){const sr=s.cells[0][0],sc=s.cells[0][1];const num=numbering.num[sr+','+sc];const value=Number(s.cells.map(p=>digit[p[0]][p[1]]).join(''));const c=arith.clue(value,rnd);const e={num,len:s.len,value,c,clue:c?fmtClue(c):'?',cells:s.cells};(s.dir==='A'?across:down).push(e);}across.sort((a,b)=>a.num-b.num);down.sort((a,b)=>a.num-b.num);return {across,down};}
+
+function generatePuzzle(params){
+  const seed=(params.seed!=null?params.seed:Math.floor(Math.random()*100000))>>>0;const rnd=mulberry32(seed);const N=params.N;const arith=makeArith(params);
+  const dmax=numDigits(params.maxSol);const maxLen=Math.min(N,dmax);
+  if(maxLen<2)return {error:'Max solution must be at least 10 so answers can have two or more digits.',seed};
+  const feas=feasibleLenSet(arith,maxLen,params.maxSol);
+  if(feas.size===0)return {error:'No reachable answers for these operations and ranges. Widen the operand range, raise the max solution, or enable more operations.',seed};
+  const maxUsable=Math.max(...feas);
+  // wordlists per feasible length (grid-independent), built once
+  const wls={};for(const L of feas){wls[L]=buildWordlist(arith,L,params.maxSol);}
+  // generate many candidate black-square patterns, then prefer the denser ones
+  // (more white cells => fewer black squares, more interlocked/playable)
+  const patternTries=N<=11?180:N<=16?90:45;
+  const cands=[];
+  for(let at=0;at<patternTries;at++){
+    const black=GRID.make(N,maxUsable,rnd,params.density);
+    const slots=extractSlots(black,N);
+    if(slots.length<2)continue;
+    if(slots.some(s=>!feas.has(s.len)))continue;
+    let white=0;for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(!black[r][c])white++;
+    cands.push({black,slots,white});
+  }
+  if(cands.length){
+    cands.sort((a,b)=>b.white-a.white); // densest (fewest black squares) first
+    for(let i=0;i<cands.length;i++){
+      const black=cands[i].black,slots=cands[i].slots;
+      const digit=fillGrid(black,N,slots,wls,rnd);if(!digit)continue;
+      const numbering=numberGrid(black,N);const clues=makeClues(slots,digit,arith,rnd,numbering);
+      return {N,black,digit,slots,numbering,clues,maxUsable,feas:[...feas].sort((a,b)=>a-b),seed,params};
+    }
+  }
+  return {error:'Could not place a valid grid with these settings. Try a different size or loosen the constraints.',seed};
+}
+function ascii(p){let out='';for(let r=0;r<p.N;r++){let row='';for(let c=0;c<p.N;c++){row+=p.black[r][c]?' \u2588':' '+p.digit[r][c];}out+=row+'\n';}return out;}
+</script>
+<script>
+
+const $=id=>document.getElementById(id);
+let current=null;
+
+function clampInt(v,lo,hi){v=Math.round(Number(v));if(!Number.isFinite(v))v=lo;return Math.max(lo,Math.min(hi,v));}
+
+function readParams(){
+  const N=clampInt($('size').value,5,25);
+  const minOp=parseInt($('minOp').value,10);
+  const maxOp=parseInt($('maxOp').value,10);
+  const maxSol=parseInt($('maxSol').value,10);
+  const ops={add:$('opAdd').checked,sub:$('opSub').checked,mul:$('opMul').checked,div:$('opDiv').checked};
+  const density=clampInt($('density').value,0,10)*0.06;
+  const errs=[];
+  if(!Number.isFinite(minOp)||!Number.isFinite(maxOp))errs.push('Enter whole-number operand limits.');
+  else if(minOp>maxOp)errs.push('The minimum operand can\u2019t be larger than the maximum.');
+  if(!Number.isFinite(maxSol))errs.push('Enter a maximum solution value.');
+  else if(maxSol<10)errs.push('Set the maximum solution to at least 10 so answers have two or more digits.');
+  if(!ops.add&&!ops.sub&&!ops.mul&&!ops.div)errs.push('Turn on at least one operation.');
+  if(errs.length)return {error:errs[0]};
+  const params={N,minOp,maxOp,maxSol,ops,density};
+  const seedRaw=$('seed').value.trim();
+  if(seedRaw!==''){const s=parseInt(seedRaw,10);if(Number.isFinite(s))params.seed=s>>>0;}
+  return {params};
+}
+
+function serialOf(seed){return 'cn-'+String(seed%100000).padStart(5,'0');}
+
+function showMessage(title,body){
+  current=null;
+  const frame=$('gridframe'),grid=$('grid');
+  grid.style.display='none';grid.innerHTML='';
+  $('akGrid').innerHTML='';$('akAcross').innerHTML='';$('akDown').innerHTML='';$('akSerial').textContent='';
+  let msg=frame.querySelector('.message');
+  if(!msg){msg=document.createElement('div');msg.className='message';frame.appendChild(msg);}
+  msg.innerHTML='<div class="big"></div><div class="txt"></div>';
+  msg.querySelector('.big').textContent=title;
+  msg.querySelector('.txt').textContent=body;
+}
+
+function buildGrid(grid,p){
+  grid.innerHTML='';grid.style.setProperty('--n',p.N);
+  for(let r=0;r<p.N;r++)for(let c=0;c<p.N;c++){
+    const d=document.createElement('div');
+    if(p.black[r][c]){d.className='cell black';}
+    else{
+      d.className='cell';
+      const num=p.numbering.num[r+','+c];
+      if(num){const s=document.createElement('span');s.className='num';s.textContent=num;d.appendChild(s);}
+      const dig=document.createElement('span');dig.className='dig';dig.textContent=p.digit[r][c];d.appendChild(dig);
+    }
+    grid.appendChild(d);
+  }
+}
+
+function renderGrid(p){
+  const frame=$('gridframe'),grid=$('grid');
+  const msg=frame.querySelector('.message');if(msg)msg.remove();
+  grid.style.display='grid';
+  buildGrid(grid,p);
+  buildGrid($('akGrid'),p);
+  fitGrid();
+}
+
+function fitGrid(){
+  if(!current)return;
+  const grid=$('grid'),frame=$('gridframe');
+  const N=current.N;
+  const avail=frame.clientWidth-36;
+  let cell=Math.floor((avail-(N+1))/N);
+  cell=Math.max(14,Math.min(40,cell));
+  grid.style.setProperty('--cell',cell+'px');
+}
+
+function clueLi(e){
+  const el=document.createElement('li');
+  el.innerHTML='<span class="cn"></span><span class="cl"></span><span class="cv"></span>';
+  el.querySelector('.cn').textContent=e.num;
+  el.querySelector('.cl').textContent=e.clue;
+  el.querySelector('.cv').textContent='= '+e.value;
+  return el;
+}
+function buildClues(aOl,dOl,p){
+  aOl.innerHTML='';dOl.innerHTML='';
+  if(!p.clues.across.length)aOl.innerHTML='<li class="empty">none</li>';
+  if(!p.clues.down.length)dOl.innerHTML='<li class="empty">none</li>';
+  p.clues.across.forEach(e=>aOl.appendChild(clueLi(e)));
+  p.clues.down.forEach(e=>dOl.appendChild(clueLi(e)));
+}
+function renderClues(p){
+  buildClues($('acrossList'),$('downList'),p);
+  buildClues($('akAcross'),$('akDown'),p);
+}
+
+function updateReadout(p){
+  const el=$('readout');
+  if(!p){el.innerHTML='<span>ready</span>';return;}
+  const o=p.params.ops,ops=[];
+  if(o.add)ops.push('+');if(o.sub)ops.push('\u2212');if(o.mul)ops.push('\u00D7');if(o.div)ops.push('\u00F7');
+  const n=p.clues.across.length+p.clues.down.length;
+  el.innerHTML=
+    '<span><b>'+serialOf(p.seed)+'</b></span>'+
+    '<span>grid <b>'+p.N+'\u00D7'+p.N+'</b></span>'+
+    '<span>clues <b>'+n+'</b></span>'+
+    '<span>operands <b>'+p.params.minOp+' \u2026 '+p.params.maxOp+'</b></span>'+
+    '<span>max <b>'+p.params.maxSol+'</b></span>'+
+    '<span>ops <b>'+ops.join(' ')+'</b></span>';
+}
+
+function applyShow(){
+  const on=$('showAnswers').checked;
+  $('grid').classList.toggle('show',on);
+  $('clues').classList.toggle('show',on);
+}
+
+function doGenerate(){
+  const r=readParams();
+  $('serial').textContent='cn-\u2026';
+  if(r.error){$('serial').textContent='cn-\u2014';showMessage('Check the settings',r.error);
+    renderClues({clues:{across:[],down:[]}});updateReadout(null);return;}
+  setTimeout(()=>{
+    const p=generatePuzzle(r.params);
+    if(p.error){$('serial').textContent=serialOf(p.seed);showMessage('No puzzle yet',p.error);
+      renderClues({clues:{across:[],down:[]}});updateReadout(null);return;}
+    current=p;
+    $('serial').textContent=serialOf(p.seed);
+    $('akSerial').textContent=serialOf(p.seed);
+    renderGrid(p);renderClues(p);updateReadout(p);applyShow();
+  },0);
+}
+
+/* wiring */
+$('sizeRange').addEventListener('input',()=>{$('size').value=$('sizeRange').value;});
+$('size').addEventListener('input',()=>{const v=clampInt($('size').value,5,25);$('sizeRange').value=v;});
+$('size').addEventListener('change',()=>{$('size').value=clampInt($('size').value,5,25);$('sizeRange').value=$('size').value;});
+$('density').addEventListener('input',()=>{$('densityOut').textContent=$('density').value;});
+$('showAnswers').addEventListener('change',applyShow);
+$('generate').addEventListener('click',doGenerate);
+$('print').addEventListener('click',()=>{try{window.print();}catch(e){}});
+$('controls').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doGenerate();}});
+window.addEventListener('resize',()=>{if(current)fitGrid();});
+
+function toRoman(n){const m=[[1000,'m'],[900,'cm'],[500,'d'],[400,'cd'],[100,'c'],[90,'xc'],[50,'l'],[40,'xl'],[10,'x'],[9,'ix'],[5,'v'],[4,'iv'],[1,'i']];let s='';for(let i=0;i<m.length;i++){while(n>=m[i][0]){s+=m[i][1];n-=m[i][0];}}return s;}
+$('yearRoman').textContent=toRoman(new Date().getFullYear());
+
+doGenerate();
+
+</script>
+</body>
+</html>
